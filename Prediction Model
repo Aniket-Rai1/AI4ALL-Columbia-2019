@@ -1,0 +1,136 @@
+import pandas as pd
+import numpy as np
+from sklearn import model_selection
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error
+from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.svm import LinearSVC
+
+data = pd.read_csv('data.csv')
+
+data.head()
+
+data.shape()
+
+X = data.loc[:, ['deltaSeed',
+       'deltaMO', 'deltaWinPct', 'deltaPointsFor', 'deltaPointsAgainst',
+       'deltaFGM', 'deltaFGA', 'deltaFGM3', 'deltaFGA3', 'deltaFTM',
+       'deltaFTA', 'deltaOR', 'deltaDR', 'deltaAst', 'deltaTO', 'deltaStl',
+       'deltaBlk', 'deltaPF']]
+y = data.loc[:,'Result']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8)
+
+models = []
+models.append(LogisticRegression())
+models.append(LinearDiscriminantAnalysis())
+models.append(KNeighborsClassifier())
+models.append(DecisionTreeClassifier())
+models.append(GaussianNB())
+models.append(SVC())
+models.append(KMeans())
+models.append(RandomForestClassifier())
+
+results = []
+
+for model in models:
+    model.fit(X_train, y_train)
+    accuracy = model.score(X_test, y_test)
+    kfold = model_selection.KFold(n_splits = 10, random_state = 42)
+    cv_results = model_selection.cross_val_score(model, X_train, y_train, cv = kfold, scoring = 'accuracy')
+    print(cv_results)
+    results.append(cv_results)
+
+fig = plt.figure()
+fig.suptitle('Algorithm Comparison')
+ax = fig.add_subplot(111)
+plt.boxplot(results)
+plt.show()
+
+final_model = LogisticRegression()
+final_model.fit(X_train, y_train)
+print(final_model.coef_)
+print(data.columns[5:])
+
+weight = final_model.coef_
+weight.sort()
+print(weight)    
+
+df1 = pd.DataFrame(final_model.predict_proba(X_test), columns = ['Team1', 'Team2'])
+a = final_model.predict(X_test)
+df2 = pd.DataFrame(list(y_test), columns = ['Actual'])
+df3 = pd.DataFrame(a, columns = ['Pred'])
+df4 = pd.DataFrame(y_test.index.values.astype(int), columns = ['Game Number'])
+result = pd.concat([df1,df2,df3,df4],axis = 1)
+result.to_excel('Probability.xlsx')
+
+team1 = input('Enter a Team Number: ')
+team2 = input('Enter another Team Number: ')
+
+team1_value1 = data.loc[data['Team1'] == int(team1)]
+team1_value2 = data.loc[data['Team2'] == int(team1)]
+team2_value1 = data.loc[data['Team1'] == int(team2)]
+team2_value2 = data.loc[data['Team2'] == int(team2)]
+
+df5 = pd.DataFrame(team1_value1)
+df6 = pd.DataFrame(team1_value2)
+df7 = pd.DataFrame(team2_value1)
+df8 = pd.DataFrame(team2_value2)
+
+new_result_team1 = pd.concat([df5, df6])
+new_result_team2 = pd.concat([df7, df8])
+
+
+new_result_team1.to_csv('team1.csv')
+new_result_team2.to_csv('team2.csv')
+
+mean_team1 = []
+mean_team2 = []
+
+for i in list(new_result_team1.columns)[5:]:
+    average = new_result_team1[i].mean()
+    mean_team1.append(average)
+print(mean_team1)
+
+for i in list(new_result_team2.columns)[5:]:
+    average = new_result_team2[i].mean()
+    mean_team2.append(average)
+print(mean_team2)
+
+new1 = []
+for i in range(len(mean_team1)):
+    modelBased = weight[0][i]*mean_team1[i]
+    new1.append(modelBased)
+print(new1)
+
+new2 = []
+for i in range(len(mean_team1)):
+    modelBased = weight[0][i]*mean_team2[i]
+    new2.append(modelBased)
+print(new2)
+
+sum1 = 0
+sum2 = 0
+
+for i in range(len(mean_team1)):
+    sum1 += new1[i]
+for i in range(len(mean_team1)):
+    sum2 += new2[i]
+print(sum1)
+print(sum2)
+
+if abs(sum1) < abs(sum2):
+    print('Team 1 has a higher chance of winning')
+elif sum == 0:
+    print('Team1 and Team2 have an equal chance of winning')
+elif abs(sum1) > abs(sum2):
+    print('Team 2 has a higher chance of winning')
